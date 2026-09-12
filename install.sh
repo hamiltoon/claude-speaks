@@ -14,6 +14,7 @@ fi
 uv pip install --python "$PY" \
     mlx-audio "misaki[en]" sounddevice \
     pyobjc-framework-Cocoa pyobjc-framework-Quartz \
+    pyobjc-framework-MediaPlayer pyobjc-framework-ApplicationServices \
     https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 mkdir -p "$HOME/.claude/hooks"
@@ -21,6 +22,11 @@ for f in speak.py speak-hook.sh speak-stop.sh speak-warm.sh; do
     ln -sfn "$HERE/$f" "$HOME/.claude/hooks/$f"
 done
 chmod +x "$HERE"/speak.py "$HERE"/speak-hook.sh "$HERE"/speak-stop.sh "$HERE"/speak-warm.sh
+
+# AirPods push-to-talk launch agent (paths in the plist assume this checkout location).
+cp "$HERE/se.hamiltoon.airpods-ptt.plist" "$HOME/Library/LaunchAgents/"
+launchctl bootout "gui/$(id -u)/se.hamiltoon.airpods-ptt" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/se.hamiltoon.airpods-ptt.plist"
 
 # Download the model once so the first utterance is not a surprise wait.
 "$PY" "$HERE/speak.py" --list-voices >/dev/null

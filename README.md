@@ -42,7 +42,9 @@ Claude Code ──UserPromptSubmit hook──▶ speak-stop.sh ──▶ speak.p
 | `speak-hook.sh` | Claude Code `Stop` hook |
 | `speak-stop.sh` | Claude Code `UserPromptSubmit` hook (hush) |
 | `speak-warm.sh` | Claude Code `SessionStart` hook (pre-warm the server) |
-| `install.sh` | venv, deps, symlinks into `~/.claude/hooks/` |
+| `airpods-ptt.py` | AirPods stem double-press → hold Space (push-to-talk) in the frontmost app |
+| `se.hamiltoon.airpods-ptt.plist` | launch agent that keeps `airpods-ptt.py` running |
+| `install.sh` | venv, deps, symlinks into `~/.claude/hooks/`, launch agent |
 | `TODO.md` | ideas and status |
 
 ## Install
@@ -81,6 +83,20 @@ Put `auto` in `~/.claude/speak.voice` and each session gets a stable voice
 derived from its session id, so parallel agents sound different.
 
 Click the cloud to dismiss it early.
+
+## AirPods push-to-talk
+
+Claude Code's voice input is hold-Space. `airpods-ptt.py` turns a double-press on
+the AirPods stem into holding Space in the frontmost app; double-press again to
+release. It catches media keys with a system event tap and swallows them, so
+Spotify does not react while it runs. First run: allow the venv's Python under
+System Settings > Privacy & Security > Accessibility. The launch agent starts it
+at login and restarts it if it dies; log in `~/.claude/airpods-ptt.log`.
+
+```bash
+launchctl bootout gui/$(id -u)/se.hamiltoon.airpods-ptt      # stop (gives the stem back to Spotify)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/se.hamiltoon.airpods-ptt.plist   # start
+```
 
 ## Tuning
 

@@ -74,13 +74,18 @@ class Holder:
 
 
 def ensure_accessibility() -> bool:
+    """Prompt once, then wait until the permission is granted (launchd would
+    otherwise restart us every few seconds, prompting each time)."""
     from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOptions
 
     if AXIsProcessTrusted():
         return True
     AXIsProcessTrustedWithOptions({"AXTrustedCheckOptionPrompt": True})
-    log("not trusted: allow this Python under System Settings > Privacy & Security > Accessibility, then rerun")
-    return False
+    log("not trusted: allow this Python under System Settings > Privacy & Security > Accessibility; waiting")
+    while not AXIsProcessTrusted():
+        time.sleep(5)
+    log("trusted, continuing")
+    return True
 
 
 def install_media_key_tap(holder: Holder):

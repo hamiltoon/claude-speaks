@@ -31,7 +31,9 @@ Roughly in the order they seem worth doing. Ticked items are done.
 ## Input
 
 - [ ] Talk back: push-to-talk with local Whisper, drop the transcript into the Claude Code prompt.
-- [ ] AirPods gesture as push-to-talk (John holds Space to talk to Claude Code; wants stem double-press or hold instead).
+- [x] AirPods gesture as push-to-talk: `airpods-ptt.py`, double-press the stem to hold/release Space. Runs as a launch agent
+  (`se.hamiltoon.airpods-ptt.plist`). Needs Accessibility permission for the venv Python; swallows media keys while running.
+  Original notes:
   Feasible: a small daemon registers as the Now Playing app via `MPRemoteCommandCenter` (MediaPlayer framework, pyobjc),
   receives the stem's play/pause and next-track commands, and toggles a synthetic Space key-down/up into the frontmost app
   with `CGEventPost`. Caveats: needs Accessibility permission for the venv Python (same wall as Esc); the daemon only
