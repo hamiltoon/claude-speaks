@@ -7,7 +7,7 @@ Roughly in the order they seem worth doing. Ticked items are done.
 - [x] Warm server: one resident Kokoro process, clients talk over a Unix socket. First audio ~0.2 s warm vs ~3.4 s cold. Quits after 10 min idle.
 - [x] Stream while generating: play the first sentence while the rest renders.
 - [x] Hush on new prompt: `UserPromptSubmit` hook sends `--stop`, cloud fades.
-- [ ] Pre-warm the server when a Claude Code session starts (`SessionStart` hook) so even the first answer is instant.
+- [x] Pre-warm the server when a Claude Code session starts (`SessionStart` hook → `speak.py --warm`) so even the first answer is instant.
 
 ## Multi-agent presence
 
@@ -31,6 +31,13 @@ Roughly in the order they seem worth doing. Ticked items are done.
 ## Input
 
 - [ ] Talk back: push-to-talk with local Whisper, drop the transcript into the Claude Code prompt.
+- [ ] AirPods gesture as push-to-talk (John holds Space to talk to Claude Code; wants stem double-press or hold instead).
+  Feasible: a small daemon registers as the Now Playing app via `MPRemoteCommandCenter` (MediaPlayer framework, pyobjc),
+  receives the stem's play/pause and next-track commands, and toggles a synthetic Space key-down/up into the frontmost app
+  with `CGEventPost`. Caveats: needs Accessibility permission for the venv Python (same wall as Esc); the daemon only
+  receives stem commands while it is the Now Playing app, so it must play silent audio and it hijacks play/pause from
+  Spotify while active; the press-and-hold gesture is reserved for Siri/noise control and cannot be intercepted, so use
+  double-press (next track). Estimate: an afternoon. Not started; wait for a quiet usage window.
 
 ## Dropped
 

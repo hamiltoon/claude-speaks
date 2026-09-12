@@ -24,7 +24,8 @@ Claude Code ──UserPromptSubmit hook──▶ speak-stop.sh ──▶ speak.p
   assistant message from the session transcript and hands it to the client,
   detached, so the hook returns instantly.
 - **Server** starts on demand, loads the model once (~3 s), then answers
-  requests in ~0.2 s. It exits by itself after 10 minutes without work.
+  requests in ~0.2 s. A `SessionStart` hook pre-warms it, so even the first
+  answer of a session is instant. It exits by itself after 10 minutes without work.
 - **Overlay** is a borderless, transparent, always-on-top window drawn with
   Core Graphics into a floating-point persistence buffer, which gives the
   smoke trails. Six frequency bands each push their own puffs outward; hue is
@@ -40,6 +41,7 @@ Claude Code ──UserPromptSubmit hook──▶ speak-stop.sh ──▶ speak.p
 | `speak.py` | client + server + overlay, single file |
 | `speak-hook.sh` | Claude Code `Stop` hook |
 | `speak-stop.sh` | Claude Code `UserPromptSubmit` hook (hush) |
+| `speak-warm.sh` | Claude Code `SessionStart` hook (pre-warm the server) |
 | `install.sh` | venv, deps, symlinks into `~/.claude/hooks/` |
 | `TODO.md` | ideas and status |
 
@@ -56,7 +58,8 @@ scripts into `~/.claude/hooks/`. Then add the hooks to `~/.claude/settings.json`
 ```json
 "hooks": {
   "Stop": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/hooks/speak-hook.sh", "timeout": 10 }] }],
-  "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/hooks/speak-stop.sh", "timeout": 5 }] }]
+  "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/hooks/speak-stop.sh", "timeout": 5 }] }],
+  "SessionStart": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/hooks/speak-warm.sh", "timeout": 5 }] }]
 }
 ```
 

@@ -15,6 +15,7 @@ Usage:
     speak.py --demo af_heart,am_fenrir,bf_emma     # hear each voice introduce itself
     speak.py --stop                                # fade out whatever is speaking now
     speak.py --serve                               # run the server (normally automatic)
+    speak.py --warm                                # start the server if needed, say nothing
 
 Voice resolution: --voice > $SPEAK_VOICE > ~/.claude/speak.voice > af_heart.
 If the chosen voice is "auto", a stable voice is derived from --session so
@@ -845,6 +846,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--demo", help="comma-separated voices; each introduces itself")
     ap.add_argument("--stop", action="store_true", help="fade out the currently running speaker")
     ap.add_argument("--serve", action="store_true", help="run the resident server")
+    ap.add_argument("--warm", action="store_true", help="make sure the server is up, then exit")
     args = ap.parse_args(argv[1:])
 
     if args.serve:
@@ -852,6 +854,8 @@ def main(argv: list[str]) -> int:
     if args.list_voices:
         print("\n".join(list_voices()))
         return 0
+    if args.warm:
+        return 0 if ensure_server() else 1
     if args.stop:
         if _send({"cmd": "stop"}) is None:
             try:

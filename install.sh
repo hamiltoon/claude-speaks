@@ -17,13 +17,13 @@ uv pip install --python "$PY" \
     https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 mkdir -p "$HOME/.claude/hooks"
-for f in speak.py speak-hook.sh speak-stop.sh; do
+for f in speak.py speak-hook.sh speak-stop.sh speak-warm.sh; do
     ln -sfn "$HERE/$f" "$HOME/.claude/hooks/$f"
 done
-chmod +x "$HERE"/speak.py "$HERE"/speak-hook.sh "$HERE"/speak-stop.sh
+chmod +x "$HERE"/speak.py "$HERE"/speak-hook.sh "$HERE"/speak-stop.sh "$HERE"/speak-warm.sh
 
 # Download the model once so the first utterance is not a surprise wait.
 "$PY" "$HERE/speak.py" --list-voices >/dev/null
 
 echo "Installed. Enable with: touch ~/.claude/speak.on"
-echo "Then add the Stop and UserPromptSubmit hooks from README.md to ~/.claude/settings.json"
+echo "Then add the Stop, UserPromptSubmit and SessionStart hooks from README.md to ~/.claude/settings.json"
