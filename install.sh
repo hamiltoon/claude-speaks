@@ -23,6 +23,13 @@ for f in speak.py speak-hook.sh speak-stop.sh speak-warm.sh; do
 done
 chmod +x "$HERE"/speak.py "$HERE"/speak-hook.sh "$HERE"/speak-stop.sh "$HERE"/speak-warm.sh
 
+# Menu bar switch: compile the Swift binary and start it at login.
+mkdir -p "$HERE/build"
+swiftc -O -swift-version 5 "$HERE/speak-menu.swift" -o "$HERE/build/speak-menu"
+cp "$HERE/se.hamiltoon.speak-menu.plist" "$HOME/Library/LaunchAgents/"
+launchctl bootout "gui/$(id -u)/se.hamiltoon.speak-menu" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/se.hamiltoon.speak-menu.plist"
+
 # AirPods push-to-talk launch agent (paths in the plist assume this checkout location).
 cp "$HERE/se.hamiltoon.airpods-ptt.plist" "$HOME/Library/LaunchAgents/"
 launchctl bootout "gui/$(id -u)/se.hamiltoon.airpods-ptt" 2>/dev/null || true

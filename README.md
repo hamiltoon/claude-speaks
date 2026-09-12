@@ -44,7 +44,9 @@ Claude Code ──UserPromptSubmit hook──▶ speak-stop.sh ──▶ speak.p
 | `speak-warm.sh` | Claude Code `SessionStart` hook (pre-warm the server) |
 | `airpods-ptt.py` | AirPods stem double-press → hold Space (push-to-talk) in the frontmost app |
 | `se.hamiltoon.airpods-ptt.plist` | launch agent that keeps `airpods-ptt.py` running |
-| `install.sh` | venv, deps, symlinks into `~/.claude/hooks/`, launch agent |
+| `speak-menu.swift` | menu bar switch: speech on/off and stop now (compiled to `build/speak-menu`) |
+| `se.hamiltoon.speak-menu.plist` | launch agent that starts the menu bar switch at login |
+| `install.sh` | venv, deps, symlinks into `~/.claude/hooks/`, builds the menu switch, launch agents |
 | `TODO.md` | ideas and status |
 
 ## Install
@@ -82,7 +84,20 @@ Voice selection: `--voice` > `$SPEAK_VOICE` > `~/.claude/speak.voice` > `af_hear
 Put `auto` in `~/.claude/speak.voice` and each session gets a stable voice
 derived from its session id, so parallel agents sound different.
 
-Click the cloud to dismiss it early.
+Click the cloud to dismiss it early; that also stops the voice.
+
+## Menu bar switch
+
+A waveform icon in the menu bar shows whether speech is on; it is crossed out
+when off. Its menu has **Speak answers** (on/off) and **Stop speaking now**.
+It toggles the same `~/.claude/speak.on` file as the terminal commands above,
+and picks up terminal changes within two seconds. It is a small native Swift
+binary (about 14 MB footprint) started at login by a launch agent. If you
+choose Quit, bring it back with:
+
+```bash
+launchctl kickstart gui/$(id -u)/se.hamiltoon.speak-menu
+```
 
 ## AirPods push-to-talk
 

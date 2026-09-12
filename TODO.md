@@ -9,6 +9,11 @@ Roughly in the order they seem worth doing. Ticked items are done.
 - [x] Hush on new prompt: `UserPromptSubmit` hook sends `--stop`, cloud fades.
 - [x] Pre-warm the server when a Claude Code session starts (`SessionStart` hook → `speak.py --warm`) so even the first answer is instant.
 
+## Controls
+
+- [x] Menu bar switch (`speak-menu.swift`): speech on/off and stop now, reflects the `speak.on` flag.
+- [x] Clicking the cloud stops the voice, not just the fade.
+
 ## Multi-agent presence
 
 - [ ] One cloud per agent, side by side. `auto` voices already give each session its own voice and colour; let overlays coexist in slots along the bottom edge instead of replacing each other.
