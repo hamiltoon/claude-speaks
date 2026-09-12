@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """AirPods stem → push-to-talk for Claude Code.
 
-Registers as the system's Now Playing app so the AirPods stem commands
-reach us, then turns a double-press (next track) into holding the Space
-key in the frontmost app. Double-press again to release.
+Two ways to catch the stem, both active:
+  1. A system-wide event tap on media-key events (play/pause, next, prev).
+     It runs before any app sees the key and swallows it, so Spotify does
+     not react. Logs every media key it sees.
+  2. Registering as the Now Playing app (MediaPlayer remote commands),
+     re-asserted every second, as a fallback.
+
+A double-press (next track) holds the Space key in the frontmost app;
+double-press again to release. Change GESTURE to "single" for play/pause.
 
 Run with ~/.venvs/kokoro/bin/python. Needs Accessibility permission for
-that Python (macOS prompts on first run). While this runs it owns
-play/pause, so pause Spotify first.
+that Python (macOS prompts on first run).
 
     airpods-ptt.py            # run in a terminal, Ctrl-C to quit
 """
@@ -17,11 +22,14 @@ import sys
 import threading
 import time
 
-import numpy as np
-
-SPACE = 49            # macOS virtual keycode
+SPACE = 49              # macOS virtual keycode
 REPEAT_INTERVAL = 0.05  # seconds between synthetic key-repeat events while held
-GESTURE = "double"    # "double" = next-track command, "single" = play/pause
+GESTURE = "double"      # "double" = next-track, "single" = play/pause
+
+# NX_KEYTYPE_* media key codes carried in NSSystemDefined events (subtype 8).
+NX_PLAY, NX_NEXT, NX_PREV, NX_FAST, NX_REWIND = 16, 17, 18, 19, 20
+NX_NAMES = {NX_PLAY: "play/pause", NX_NEXT: "next", NX_PREV: "previous", NX_FAST: "fast", NX_REWIND: "rewind"}
+TOGGLE_KEYS = {"double": {NX_NEXT, NX_FAST}, "single": {NX_PLAY}}[GESTURE]
 
 
 def log(msg: str) -> None:
@@ -75,6 +83,42 @@ def ensure_accessibility() -> bool:
     return False
 
 
+def install_media_key_tap(holder: Holder):
+    """Path 1: swallow media keys system-wide."""
+    import Quartz as Q
+    from Cocoa import NSEvent
+
+    NX_SYSDEFINED = 14
+
+    def callback(_proxy, etype, event, _refcon):
+        if etype == NX_SYSDEFINED:
+            ns = NSEvent.eventWithCGEvent_(event)
+            if ns is not None and ns.subtype() == 8:
+                data1 = ns.data1()
+                key = (data1 & 0xFFFF0000) >> 16
+                state = (data1 & 0xFF00) >> 8  # 0x0A down, 0x0B up
+                if state == 0x0A:
+                    log(f"media key: {NX_NAMES.get(key, key)}")
+                    if key in TOGGLE_KEYS:
+                        holder.toggle()
+                if key in NX_NAMES:
+                    return None  # swallow so Spotify & co never see it
+        return event
+
+    tap = Q.CGEventTapCreate(
+        Q.kCGSessionEventTap, Q.kCGHeadInsertEventTap, Q.kCGEventTapOptionDefault,
+        Q.CGEventMaskBit(NX_SYSDEFINED), callback, None,
+    )
+    if tap is None:
+        log("event tap could not be created (Accessibility permission?)")
+        return None
+    src = Q.CFMachPortCreateRunLoopSource(None, tap, 0)
+    Q.CFRunLoopAddSource(Q.CFRunLoopGetCurrent(), src, Q.kCFRunLoopCommonModes)
+    Q.CGEventTapEnable(tap, True)
+    log("media-key tap installed")
+    return tap
+
+
 def silent_audio():
     """Play silence so macOS treats us as an active audio app."""
     import sounddevice as sd
@@ -87,6 +131,39 @@ def silent_audio():
     return stream
 
 
+def install_now_playing(holder: Holder):
+    """Path 2: be the Now Playing app so remote commands are routed to us."""
+    import MediaPlayer as MP
+
+    center = MP.MPRemoteCommandCenter.sharedCommandCenter()
+
+    def handler_factory(name, act):
+        def handler(_event):
+            log(f"remote command: {name}")
+            if act:
+                holder.toggle()
+            return MP.MPRemoteCommandHandlerStatusSuccess
+        return handler
+
+    center.nextTrackCommand().addTargetWithHandler_(handler_factory("next", GESTURE == "double"))
+    center.togglePlayPauseCommand().addTargetWithHandler_(handler_factory("toggle", GESTURE == "single"))
+    center.playCommand().addTargetWithHandler_(handler_factory("play", GESTURE == "single"))
+    center.pauseCommand().addTargetWithHandler_(handler_factory("pause", GESTURE == "single"))
+    center.previousTrackCommand().addTargetWithHandler_(handler_factory("previous", False))
+
+    info = MP.MPNowPlayingInfoCenter.defaultCenter()
+
+    def assert_playing():
+        info.setNowPlayingInfo_({
+            MP.MPMediaItemPropertyTitle: "Claude push-to-talk",
+            MP.MPMediaItemPropertyArtist: "claude-speaks",
+            MP.MPNowPlayingInfoPropertyPlaybackRate: 1.0,
+        })
+        info.setPlaybackState_(MP.MPNowPlayingPlaybackStatePlaying)
+
+    return info, assert_playing
+
+
 def main() -> int:
     from Cocoa import NSApplication, NSRunLoop, NSDate
     import MediaPlayer as MP
@@ -97,35 +174,18 @@ def main() -> int:
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(1)  # accessory
     stream = silent_audio()
-
-    center = MP.MPRemoteCommandCenter.sharedCommandCenter()
-
-    def handler_factory(name, act):
-        def handler(_event):
-            log(f"stem: {name}")
-            if act:
-                holder.toggle()
-            return MP.MPRemoteCommandHandlerStatusSuccess
-        return handler
-
-    center.nextTrackCommand().addTargetWithHandler_(handler_factory("double-press", GESTURE == "double"))
-    center.togglePlayPauseCommand().addTargetWithHandler_(handler_factory("single-press", GESTURE == "single"))
-    center.playCommand().addTargetWithHandler_(handler_factory("play", GESTURE == "single"))
-    center.pauseCommand().addTargetWithHandler_(handler_factory("pause", GESTURE == "single"))
-    center.previousTrackCommand().addTargetWithHandler_(handler_factory("triple-press", False))
-
-    info = MP.MPNowPlayingInfoCenter.defaultCenter()
-    info.setNowPlayingInfo_({
-        MP.MPMediaItemPropertyTitle: "Claude push-to-talk",
-        MP.MPMediaItemPropertyArtist: "claude-speaks",
-        MP.MPNowPlayingInfoPropertyPlaybackRate: 1.0,
-    })
-    info.setPlaybackState_(MP.MPNowPlayingPlaybackStatePlaying)
+    tap = install_media_key_tap(holder)
+    info, assert_playing = install_now_playing(holder)
+    assert_playing()
     log(f"ready: {GESTURE}-press the AirPods stem to hold/release Space. Ctrl-C to quit.")
 
+    last = 0.0
     try:
         while True:
             NSRunLoop.currentRunLoop().runMode_beforeDate_("kCFRunLoopDefaultMode", NSDate.dateWithTimeIntervalSinceNow_(0.2))
+            if time.time() - last > 1.0:
+                assert_playing()
+                last = time.time()
     except KeyboardInterrupt:
         pass
     finally:
