@@ -223,6 +223,11 @@ class Synth:
         from mlx_audio.tts.utils import load_model
 
         self.model = load_model(MODEL)
+        # Loading the model is not enough: the phonemizer pipeline and the
+        # voice load lazily on the first generate. Render one short throwaway
+        # sentence (never played) so the first real answer starts instantly.
+        for _ in self.sentences("Ready.", VOICE, threading.Event()):
+            pass
 
     def sentences(self, text: str, voice: str, cancel: threading.Event):
         lang = voice[0] if voice[:1] in "abefhijpz" else "a"
@@ -344,6 +349,7 @@ class NebulaOverlay:
         self.bands_fn = lambda: np.zeros(len(BANDS))
         self.finished = lambda: False
         self.on_hidden = lambda: None
+        self.on_click = lambda: None  # server wires this to stop the audio
         owner = self
 
         class NebulaView(NSView):
@@ -352,6 +358,7 @@ class NebulaOverlay:
 
             def mouseDown_(self, _event):
                 owner.fading_out = True
+                owner.on_click()
 
             def drawRect_(self, _rect):
                 try:
@@ -687,7 +694,8 @@ class Server:
         self.overlay.finished = lambda: (
             self.gen_done.is_set() and (self.player is None or self.player.done.is_set() or self.player.near_end())
         )
-        signal.signal(signal.SIGUSR1, lambda *_: self.stop_current())
+        self.overlay.on_click = lambda: self.stop_current("click")
+        signal.signal(signal.SIGUSR1, lambda *_: self.stop_current("signal"))
         signal.signal(signal.SIGTERM, lambda *_: self.overlay.stop_app())
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.bind(SOCK_FILE)
@@ -727,15 +735,17 @@ class Server:
             self.last_activity = time.time()
             cmd = req.get("cmd")
             if cmd == "speak":
-                self.stop_current()
+                self.stop_current("new request")
                 self.requests.put(req)
             elif cmd == "stop":
-                self.stop_current()
+                self.stop_current("stop command")
             conn.sendall(b'{"ok": true}\n')
 
     # -- work ------------------------------------------------------------
 
-    def stop_current(self):
+    def stop_current(self, why: str = ""):
+        if self.player and not self.player.done.is_set():
+            log(f"stop: {why}")
         self.cancel.set()
         if self.player:
             self.player.done.set()
@@ -782,6 +792,7 @@ class Server:
         player.close()
         self.gen_done.set()
         player.done.wait()
+        log(f"playback ended after {time.time() - t0:.1f}s")
         # Wait for the fade-out to hide the window before taking the next job.
         while self.overlay.visible and not cancel.is_set():
             time.sleep(0.05)
