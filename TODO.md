@@ -35,3 +35,10 @@ Roughly in the order they seem worth doing. Ticked items are done.
 ## Dropped
 
 - Esc to stop: needs Accessibility trust for the venv Python, and Esc also interrupts a running Claude Code turn. `--stop` over the socket does the job without side effects.
+
+## Considered: rewrite in Rust (2026-09-12, decided against)
+
+- Latency is model-bound: warm first audio is ~0.2 s and almost all of it is Kokoro on the GPU. Python overhead is milliseconds; the client's ~0.1 s startup is hidden behind the detached hook.
+- Blocker: Kokoro's English phonemizer (misaki) is Python-only. The Rust path is ONNX via `ort` plus espeak-ng phonemes, which audibly lowers voice quality.
+- What Rust would buy: one binary, no venv quirks, tens of MB idle instead of hundreds (torch/transformers imports), cold start under 1 s. A `SessionStart` pre-warm hook gets the cold-start win in Python for free.
+- If a Rust project is wanted anyway: rewrite only the overlay + client as a small binary speaking the existing socket protocol to the Python synthesis server. Clean cut, exercises `objc2` and real-time Core Graphics, keeps the voice.
