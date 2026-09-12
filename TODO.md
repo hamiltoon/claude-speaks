@@ -51,3 +51,10 @@ Roughly in the order they seem worth doing. Ticked items are done.
 - Blocker: Kokoro's English phonemizer (misaki) is Python-only. The Rust path is ONNX via `ort` plus espeak-ng phonemes, which audibly lowers voice quality.
 - What Rust would buy: one binary, no venv quirks, tens of MB idle instead of hundreds (torch/transformers imports), cold start under 1 s. A `SessionStart` pre-warm hook gets the cold-start win in Python for free.
 - If a Rust project is wanted anyway: rewrite only the overlay + client as a small binary speaking the existing socket protocol to the Python synthesis server. Clean cut, exercises `objc2` and real-time Core Graphics, keeps the voice.
+
+## Open: AirPods push-to-talk, status 2026-09-12 evening
+
+Launch agent is unloaded for now (`launchctl bootout`). Findings from the log:
+- The stem arrives as a MediaPlayer remote command ("remote command: next"), NOT as a system media-key event, so the event tap never sees it and cannot keep Spotify out of it. The Now Playing route is the only one that works.
+- First double-press engaged ("holding Space"); the second double-press never reached the daemon, so Space stayed held. Suspects: MediaRemote debouncing repeated next-track commands, or the app losing Now Playing status once Space is held. Try: toggle on play/pause (single press) instead, or release automatically after N seconds of silence, or release on any remote command.
+- Kill via SIGTERM leaves Space logically held: add a SIGTERM handler that releases before exit.
